@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::prelude::*;
+
 use clap::{App, Arg};
 
 extern crate hex;
@@ -11,6 +14,7 @@ enum Mode {
     b64h,
     xor,
     cipher,
+    bforce,
     fail,
 }
 
@@ -56,6 +60,13 @@ fn main() {
                 .help("hex string brute force u8 xor cipher")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("bforce")
+                .short("f")
+                .long("bforce")
+                .help("file name to brute force u8 xor cipher against - cryptopasl set 1 challenge 4")
+                .takes_value(true),
+        )
         .get_matches();
 
     let mode;
@@ -67,6 +78,8 @@ fn main() {
         mode = Mode::xor;
     } else if matches.is_present("cipher") {
         mode = Mode::cipher;
+    } else if matches.is_present("bforce") {
+        mode = Mode::bforce;
     } else {
         mode = Mode::fail;
     }
@@ -98,11 +111,42 @@ fn main() {
         Mode::cipher => {
             let c = hex::decode(matches.value_of("cipher").unwrap()).expect("decoding hex failed");
 
-            let (key, output) = xor::xor_cipher_bruteforce(c);
+            let (key, high, output) = xor::xor_cipher_bruteforce(c);
 
             // translate the vector of chars to a string
             let s: String = output.into_iter().map(|c| c as char).collect();
-            println!("key: 0x{:02x} plaintext: {}", key, s);
+            println!("key: 0x{:02x} score: {}  plaintext: {}", key, high, s);
+        }
+        Mode::bforce => {
+            let mut file = File::open(matches.value_of("bforce").unwrap().to_string()).unwrap();
+            let mut buffer = Vec::new();
+            let len = file.read_to_end(&mut buffer).unwrap();
+            println!("file read: {} bytes", len);
+
+            let mut array: Vec<Vec<u8>> = Vec::new();
+            let mut i = 0;
+
+            'a: loop {
+                let mut temp: Vec<u8> = Vec::new();
+                'b: loop {
+                    if i == len {
+                        break 'a;
+                    } else if buffer[i] == 0x0a {
+                        break 'b;
+                    }
+
+                    temp.push(buffer[i]);
+                    i += 1;
+                }
+                array.push(hex::decode(temp).unwrap());
+                i += 1;
+            }
+
+            let (key, score, v) = xor::xor_cipher_bruteforce_all(array);
+
+            // translate the vector of chars to a string
+            let s: String = v.into_iter().map(|c| c as char).collect();
+            println!("key: {:02x} score: {} plaintext: {}", key, score, s);
         }
         _ => println!("Unsupported mode"),
     }
