@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::prelude::*;
-
 use clap::{App, Arg};
 
 extern crate hex;
@@ -15,6 +14,7 @@ enum Mode {
     xor,
     cipher,
     bforce,
+    xorkey,
     fail,
 }
 
@@ -28,14 +28,16 @@ fn main() {
                 .short("e")
                 .long("encode")
                 .help("string to encode")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with_all(&["hex", "xora", "xorb", "cipher", "bforce", "xorkey"])
         )
         .arg(
             Arg::with_name("hex")
                 .short("x")
                 .long("hex")
                 .help("hex string to encode")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with_all(&["xora", "xorb", "cipher", "bforce"])
         )
         .arg(
             Arg::with_name("xora")
@@ -43,7 +45,8 @@ fn main() {
                 .long("xora")
                 .help("hex string to xor A")
                 .takes_value(true)
-                .requires("xorb"),
+                .requires("xorb")
+                .conflicts_with_all(&["cipher", "bforce", "xorkey"])
         )
         .arg(
             Arg::with_name("xorb")
@@ -51,27 +54,40 @@ fn main() {
                 .long("xorb")
                 .help("hex string to xor B")
                 .takes_value(true)
-                .requires("xora"),
+                .requires("xora")
+                .conflicts_with_all(&["cipher", "bforce", "xorkey"])
         )
         .arg(
             Arg::with_name("cipher")
                 .short("c")
                 .long("cipher")
                 .help("hex string brute force u8 xor cipher")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with_all(&["bforce", "xorkey"])
         )
         .arg(
             Arg::with_name("bforce")
                 .short("f")
                 .long("bforce")
                 .help("file name to brute force u8 xor cipher against - cryptopasl set 1 challenge 4")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with("xorkey")
+        )
+        .arg(
+            Arg::with_name("xorkey")
+                .short("k")
+                .long("xorkey")
+                .help("xor a string with a repeating key")
+                .takes_value(true)
+                .requires("hex")
         )
         .get_matches();
 
     let mode;
     if matches.is_present("encode") {
         mode = Mode::b64s;
+    } else if matches.is_present("xorkey") {
+        mode = Mode::xorkey;
     } else if matches.is_present("hex") {
         mode = Mode::b64h;
     } else if matches.is_present("xora") && matches.is_present("xorb") {
@@ -147,6 +163,17 @@ fn main() {
             // translate the vector of chars to a string
             let s: String = v.into_iter().map(|c| c as char).collect();
             println!("key: {:02x} score: {} plaintext: {}", key, score, s);
+        }
+        Mode::xorkey => {
+            let key = String::into_bytes(matches.value_of("xorkey").unwrap().to_string());
+            let orig = String::into_bytes(matches.value_of("hex").unwrap().to_string());
+
+            let output = xor::xor_repeat(key, orig);
+
+            for i in output {
+                print!("{:02x}", i);
+            }
+            println!();
         }
         _ => println!("Unsupported mode"),
     }

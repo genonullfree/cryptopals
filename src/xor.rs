@@ -22,6 +22,28 @@ pub fn xor(mut a: Vec<u8>, mut b: Vec<u8>) -> Vec<u8> {
     xor
 }
 
+pub fn xor_repeat(key: Vec<u8>, orig: Vec<u8>) -> Vec<u8> {
+    let key_len = key.len();
+    let orig_len = orig.len();
+
+    if (key_len == 0) || (orig_len == 0) {
+        return Vec::new();
+    }
+
+    let mut xor: Vec<u8> = Vec::new();
+    let mut i = 0;
+    loop {
+        xor.push(orig[i] ^ key[i % key_len]);
+        i += 1;
+
+        if i == orig_len {
+            break;
+        }
+    }
+
+    xor
+}
+
 pub fn xor_cipher_bruteforce_all(a: Vec<Vec<u8>>) -> (u8, u64, Vec<u8>) {
     let mut score = 0;
     let mut index = 0;
