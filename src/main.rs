@@ -1,10 +1,10 @@
+use clap::{App, Arg};
 use std::fs::File;
 use std::io::prelude::*;
-use clap::{App, Arg};
+use ::base64::*;
 
 extern crate hex;
 
-mod base64;
 mod xor;
 
 #[allow(non_camel_case_types)]
@@ -15,6 +15,7 @@ enum Mode {
     cipher,
     bforce,
     xorkey,
+    breakxor,
     fail,
 }
 
@@ -29,7 +30,9 @@ fn main() {
                 .long("encode")
                 .help("string to encode")
                 .takes_value(true)
-                .conflicts_with_all(&["hex", "xora", "xorb", "cipher", "bforce", "xorkey"])
+                .conflicts_with_all(&[
+                    "hex", "xora", "xorb", "cipher", "bforce", "xorkey", "breakxor",
+                ]),
         )
         .arg(
             Arg::with_name("hex")
@@ -37,7 +40,7 @@ fn main() {
                 .long("hex")
                 .help("hex string to encode")
                 .takes_value(true)
-                .conflicts_with_all(&["xora", "xorb", "cipher", "bforce"])
+                .conflicts_with_all(&["xora", "xorb", "cipher", "bforce", "breakxor"]),
         )
         .arg(
             Arg::with_name("xora")
@@ -46,7 +49,7 @@ fn main() {
                 .help("hex string to xor A")
                 .takes_value(true)
                 .requires("xorb")
-                .conflicts_with_all(&["cipher", "bforce", "xorkey"])
+                .conflicts_with_all(&["cipher", "bforce", "xorkey", "breakxor"]),
         )
         .arg(
             Arg::with_name("xorb")
@@ -55,7 +58,7 @@ fn main() {
                 .help("hex string to xor B")
                 .takes_value(true)
                 .requires("xora")
-                .conflicts_with_all(&["cipher", "bforce", "xorkey"])
+                .conflicts_with_all(&["cipher", "bforce", "xorkey", "breakxor"]),
         )
         .arg(
             Arg::with_name("cipher")
@@ -63,15 +66,17 @@ fn main() {
                 .long("cipher")
                 .help("hex string brute force u8 xor cipher")
                 .takes_value(true)
-                .conflicts_with_all(&["bforce", "xorkey"])
+                .conflicts_with_all(&["bforce", "xorkey", "breakxor"]),
         )
         .arg(
             Arg::with_name("bforce")
                 .short("f")
                 .long("bforce")
-                .help("file name to brute force u8 xor cipher against - cryptopasl set 1 challenge 4")
+                .help(
+                    "file name to brute force u8 xor cipher against - cryptopasl set 1 challenge 4",
+                )
                 .takes_value(true)
-                .conflicts_with("xorkey")
+                .conflicts_with_all(&["xorkey", "breakxor"]),
         )
         .arg(
             Arg::with_name("xorkey")
@@ -80,6 +85,14 @@ fn main() {
                 .help("xor a string with a repeating key")
                 .takes_value(true)
                 .requires("hex")
+                .conflicts_with("breakxor"),
+        )
+        .arg(
+            Arg::with_name("breakxor")
+                .short("z")
+                .long("breakxor")
+                .help("break repeating key xor")
+                .takes_value(true),
         )
         .get_matches();
 
@@ -96,6 +109,8 @@ fn main() {
         mode = Mode::cipher;
     } else if matches.is_present("bforce") {
         mode = Mode::bforce;
+    } else if matches.is_present("breakxor") {
+        mode = Mode::breakxor;
     } else {
         mode = Mode::fail;
     }
@@ -168,9 +183,25 @@ fn main() {
             let key = String::into_bytes(matches.value_of("xorkey").unwrap().to_string());
             let orig = String::into_bytes(matches.value_of("hex").unwrap().to_string());
 
-            let output = xor::xor_repeat(key, orig);
+            let output = xor::xor_repeat(&key, orig);
 
             for i in output {
+                print!("{:02x}", i);
+            }
+            println!();
+        }
+        Mode::breakxor => {
+            let mut file = File::open(matches.value_of("breakxor").unwrap().to_string()).unwrap();
+            let mut a = Vec::new();
+            let len = file.read_to_end(&mut a).unwrap();
+            println!("file read: {} bytes", len);
+
+            let (key, plaintext) = xor::break_xor(a);
+            println!("probable key len: {}", key.len());
+            let mut s: String = plaintext.into_iter().map(|c| c as char).collect();
+            s.truncate(25);
+            print!("plaintext: [{}] key: ", s);
+            for i in key {
                 print!("{:02x}", i);
             }
             println!();

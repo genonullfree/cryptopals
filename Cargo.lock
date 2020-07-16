@@ -21,6 +21,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64"
+version = "0.1.0"
+source = "git+https://github.com/genonullfree/base64.git#7fa12c49a3f7a3fb36334624e105ac10b48c3096"
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -45,6 +50,7 @@ dependencies = [
 name = "cpals"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "clap",
  "hex",
 ]
