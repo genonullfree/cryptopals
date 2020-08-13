@@ -2,9 +2,7 @@
 
 ## Set 1
 
-This solves:
-* Challenge 1
-* Challenge 2
-* Challenge 3
-* Challenge 4
-* Challenge 5
+This currently solves:
+* Challenge 6
+
+See previous tags for earlier challenges.
