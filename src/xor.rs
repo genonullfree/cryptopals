@@ -1,10 +1,7 @@
 use std::cmp;
 
-struct Library {
-    key: u8,
-    score: u64,
-    book: Vec<u8>,
-}
+extern crate frequency_analysis;
+use frequency_analysis::english::*;
 
 pub fn xor(mut a: Vec<u8>, mut b: Vec<u8>) -> Vec<u8> {
     if (a.len() != b.len()) || (a.len() == 0) || (b.len() == 0) {
@@ -22,6 +19,43 @@ pub fn xor(mut a: Vec<u8>, mut b: Vec<u8>) -> Vec<u8> {
     }
 
     xor
+}
+
+pub fn xor_find_key(keys: &Vec<Vec<u8>>, a: &Vec<u8>) -> (Vec<u8>, Vec<u8>) {
+    let mut initial_key = keys.clone();
+    let mut final_key = Vec::new();
+    let mut final_plain = Vec::new();
+
+    let mut possiblek = 1;
+    for i in keys {
+        possiblek *= i.len();
+    }
+
+    if possiblek == 0 {
+        return (final_key, final_plain);
+    }
+
+    println!("Found {} possible key(s)!", possiblek);
+
+    loop {
+        let try_key = initial_key.iter().map(|x| x[0]).collect();
+        let plaintext = xor_repeat(&try_key, (&a).to_vec());
+
+        if is_likely_english(&plaintext) {
+            final_key = try_key.to_vec();
+            final_plain = plaintext;
+            break;
+        }
+
+        for (num, i) in initial_key.iter().enumerate() {
+            if i.len() > 1 {
+                initial_key[num].remove(0);
+                break;
+            }
+        }
+    }
+
+    (final_key, final_plain)
 }
 
 pub fn xor_repeat(key: &Vec<u8>, orig: Vec<u8>) -> Vec<u8> {
@@ -46,38 +80,7 @@ pub fn xor_repeat(key: &Vec<u8>, orig: Vec<u8>) -> Vec<u8> {
     xor
 }
 
-pub fn xor_cipher_bruteforce_all(a: Vec<Vec<u8>>) -> (u8, u64, Vec<u8>) {
-    let mut score = 0;
-    let mut index = 0;
-    let mut c = 0;
-    let mut library: Vec<Library> = Vec::new();
-
-    for tome in a {
-        let (k, s, v) = xor_cipher_bruteforce(tome);
-        let county: Library = Library {
-            key: k,
-            score: s,
-            book: v,
-        };
-        library.push(county);
-    }
-
-    for i in &library {
-        if i.score > score {
-            score = i.score;
-            index = c;
-        }
-        if c < u64::MAX {
-            c += 1;
-        }
-    }
-
-    let book = &library[index as usize].book;
-    let key = library[index as usize].key;
-
-    (key, score, book.to_vec())
-}
-pub fn xor_cipher_bruteforce(a: Vec<u8>) -> (u8, u64, Vec<u8>) {
+pub fn xor_cipher_bruteforce(a: Vec<u8>) -> Vec<u8> {
     let mut tome: Vec<Vec<u8>> = Vec::new();
 
     let mut i = 0;
@@ -90,83 +93,88 @@ pub fn xor_cipher_bruteforce(a: Vec<u8>) -> (u8, u64, Vec<u8>) {
     }
 
     let scores = calc_cipher_score(&tome);
-    println!("{:?}", scores);
-    let (index, high) = find_highest_score(scores);
-    let v = &tome[index as usize];
+    let mut possible_keys = Vec::new();
+    for i in 0..scores.len() {
+        if scores[i] > 10 {
+            possible_keys.push(i as u8);
+        }
+    }
 
-    (index, high, v.to_vec())
+    possible_keys
 }
 
-fn calc_cipher_score(a: &Vec<Vec<u8>>) -> Vec<i64> {
-    let mut scores: Vec<i64> = Vec::new();
+fn calc_cipher_score(a: &Vec<Vec<u8>>) -> Vec<u8> {
+    let mut scores: Vec<u8> = Vec::new();
+
     for i in a {
-        let mut num = 0;
-        for j in i {
-            if ((*j >= 0x41 as u8) && (*j <= 0x5a as u8))
-                || ((*j >= 0x61 as u8) && (*j <= 0x7a as u8))
-                || (*j == 0x20 as u8)
-                || (*j == 0x2c as u8)
-                || (*j == 0x2e as u8)
-                || (*j == 0x0a as u8)
-            {
-                num += 1;
-            } else if ((*j >= 0x00 as u8) && (*j <= 0x1f)) || (*j >= 0x7f as u8) {
-                num -= 1;
-            }
+        let mut temp = 0;
+
+        if printable_ascii(i) {
+            temp |= 1;
+        } else {
+            scores.push(temp);
+            continue;
         }
 
+        if have_vowels(i) {
+            temp |= 2;
+        }
 
+        if have_freq_chars(i, 38_f64) {
+            temp |= 4;
+        }
 
-        scores.push(num);
+        if have_freq_punctuation(i, 10_f64) {
+            temp |= 8;
+        }
+
+        scores.push(temp);
     }
 
     scores
 }
 
-fn find_highest_score(a: Vec<i64>) -> (u8, u64) {
-    let mut high = 0;
-    let mut h_index = 0;
-    let mut c = 0;
-
-    for i in a {
-        if i >= high {
-            high = i;
-            h_index = c;
-        }
-        if c < u8::MAX {
-            c += 1;
-        }
-    }
-
-    (h_index, high as u64)
-}
-
 pub fn break_xor(a: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
-    let keysize = find_key_size(&a);
-    let mut key: Vec<u8> = Vec::new();
-    let mut b: Vec<Vec<u8>> = Vec::new();
+    let mut keysize = 1; //find_key_size(&a);
+    loop {
+        let mut key: Vec<Vec<u8>> = Vec::new();
+        let mut b: Vec<Vec<u8>> = Vec::new();
 
-    for h in 0..keysize {
-        let mut tmp: Vec<u8> = Vec::new();
-        for i in (h..a.len() as u64).step_by(keysize as usize) {
-            tmp.push(a[i as usize]);
+        for h in 0..keysize {
+            let mut tmp: Vec<u8> = Vec::new();
+            for i in (h..a.len() as u64).step_by(keysize as usize) {
+                tmp.push(a[i as usize]);
+            }
+            b.push(tmp);
         }
-        b.push(tmp);
+
+        println!("trying keysize: {}", keysize);
+
+        let mut _count = 0;
+        for i in b {
+            let scores = xor_cipher_bruteforce(i);
+
+            key.push(scores);
+            _count += 1;
+        }
+
+        if key.contains(&Vec::new()) {
+            keysize += 1;
+            continue;
+        }
+
+        let (keyf, plain) = xor_find_key(&key, &a);
+
+        if keyf.len() > 0 {
+            return (keyf, plain);
+        }
+
+        if keysize > 40 {
+            return (Vec::new(), Vec::new());
+        }
+
+        keysize += 1;
     }
-
-    println!("keysize: {} b.len: {}", keysize, b.len());
-
-    let mut count = 0;
-    for i in b {
-        let (keyc, score, _) = xor_cipher_bruteforce(i);
-        println!("key[{}]: {:02x}, score: {}", count, keyc, score);
-        key.push(keyc);
-        count += 1;
-    }
-
-    let plain = xor_repeat(&key, a);
-
-    (key, plain)
 }
 
 pub fn find_key_size(a: &Vec<u8>) -> u64 {
@@ -196,6 +204,7 @@ pub fn find_key_size(a: &Vec<u8>) -> u64 {
             ham = res;
             keysize = i as u64;
         }
+        println!("keysize: {} hamming: {}", i, res);
     }
 
     keysize
@@ -210,17 +219,4 @@ fn hamming(a: Vec<u8>, b: Vec<u8>) -> u64 {
     }
 
     ham
-}
-
-fn _print_library(a: &Vec<Library>) {
-    let mut line = 0;
-    for i in a {
-        let book = &i.book;
-        let s: String = book.into_iter().map(|c| *c as char).collect();
-        println!(
-            "line: {} key: {:02x} score: {} plaintext: {}",
-            line, i.key, i.score, s
-        );
-        line += 1;
-    }
 }

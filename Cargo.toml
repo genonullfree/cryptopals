@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 clap = "2.33.1"
 hex = "0.4.2"
-base64 = { git = "https://github.com/genonullfree/base64.git" }
+frequency_analysis = { git = "https://github.com/genonullfree/frequency_analysis.git" }
