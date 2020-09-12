@@ -3,6 +3,7 @@ use std::cmp;
 extern crate frequency_analysis;
 use frequency_analysis::english::*;
 
+#[allow(dead_code)]
 pub fn xor(mut a: Vec<u8>, mut b: Vec<u8>) -> Vec<u8> {
     if (a.len() != b.len()) || (a.len() == 0) || (b.len() == 0) {
         return Vec::new();
@@ -177,6 +178,7 @@ pub fn break_xor(a: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     }
 }
 
+#[allow(dead_code)]
 pub fn find_key_size(a: &Vec<u8>) -> u64 {
     let mut keysize: u64 = 0;
     let mut ham: f64 = 999999999 as f64;
@@ -210,6 +212,7 @@ pub fn find_key_size(a: &Vec<u8>) -> u64 {
     keysize
 }
 
+#[allow(dead_code)]
 fn hamming(a: Vec<u8>, b: Vec<u8>) -> u64 {
     let c = xor(a, b);
     let mut ham: u64 = 0;
